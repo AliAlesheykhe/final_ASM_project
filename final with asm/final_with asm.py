@@ -30,16 +30,16 @@ blue = (0, 0, 255)
 
 # Function to move the ball based on its path
 def move_ball_path(ball):
-    x = ffi.new("double *", ball['pos'][0])
-    y = ffi.new("double *", ball['pos'][1])
-    vel_x = ffi.new("double *", ball['vel_x'])
-    vel_y = ffi.new("double *", ball['vel_y'])
-    gravity = ffi.new("double *", ball['gravity'] * 0.1)
-    w = ffi.new("double *", ball['w'])
-    angle = ffi.new("double *", math.radians(ball['angle']))
-    amp = ffi.new("double *", 20)
-    
-    start_time = time.perf_counter()    
+    x = ffi.new("double[4]", [ball['pos'][0]])
+    y = ffi.new("double[4]", [ball['pos'][1]])
+    vel_x = ffi.new("double[4]", [ball['vel_x']])
+    vel_y = ffi.new("double[4]", [ball['vel_y']])
+    gravity = ffi.new("double*", ball['gravity'])
+    w = ffi.new("double*", ball['w'])
+    angle = ffi.new("double*", math.radians(ball['angle']))
+    amp = ffi.new("double*", 20)
+
+    start_time = time.perf_counter()
     # Update the ball's position based on its path
     if ball['path'] == 'straight':
         x[0] += vel_x[0]
@@ -54,7 +54,7 @@ def move_ball_path(ball):
     end_time = time.perf_counter()
     duration = end_time - start_time
     durations.append(duration)
-    
+
     return x[0], y[0], vel_x[0], vel_y[0]
 
 # List of balls
@@ -82,10 +82,10 @@ while running:
     current_time = time.time()
     if current_time - last_shot_time > t:
         path_choice = random.choice(['straight', 'angled', 'parabolic', 'sinusoidal'])
-        
+        path_choice = "sinusoidal"
         if path_choice == "parabolic":
             angle = random.randint(20, 30)
-        else: 
+        else:
             angle = random.randint(-20, 20)
         vel = random.randint(20, 30)
         vel_x = vel * math.cos(math.radians(angle))
@@ -114,7 +114,7 @@ while running:
     for ball in balls:
         # Move and draw the ball
         ball['pos'][0], ball['pos'][1], ball["vel_x"], ball['vel_y'] = move_ball_path(ball)
-        
+
         if player.colliderect(pygame.Rect(int(ball['pos'][0]), int(ball['pos'][1]), 10, 10)):
             balls.remove(ball)
             score += 1

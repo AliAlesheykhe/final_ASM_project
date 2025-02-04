@@ -69,7 +69,7 @@ while running:
     current_time = time.time()  # Get the current time
     if current_time - last_shot_time > t:  # Check if the time since the last shot exceeds t seconds
         path_choice = random.choice(['straight', 'angled', 'parabolic', 'sinusoidal'])  # Choose a random path
-        
+        path_choice = "sinusoidal"
         if path_choice == "parabolic":
             angle = random.randint(20, 30)
         else: 
