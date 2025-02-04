@@ -2,24 +2,18 @@ import pygame
 import math
 import random
 import time
-import ctypes
+import cffi
 
-
-# Path to the shared library
-lib_path = "/media/aa/84423E3E423E34F0/University/computer structure and language/final project/final with asm/libballmotion.so"
+# Initialize cffi
+ffi = cffi.FFI()
+ffi.cdef("""
+    void move_parabolic(double *x, double *y, double *vel_x, double *vel_y, double *gravity);
+    void move_sinusoidal(double *x, double *y, double *vel_x, double *w, double *amp);
+    void move_angled(double *x, double *y, double *vel_x, double *angle);
+""")
 
 # Load the shared library
-lib = ctypes.CDLL(lib_path)
-
-# Define the argument and return types for the C functions
-lib.move_parabolic.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), 
-                               ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double)]
-
-lib.move_sinusoidal.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), 
-                                ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double)]
-
-lib.move_angled.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), 
-                            ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double)]
+lib = ffi.dlopen("/media/aa/84423E3E423E34F0/University/computer structure and language/final project/final with asm/libballmotion.so")
 
 # Initialize pygame
 pygame.init()
@@ -36,37 +30,32 @@ blue = (0, 0, 255)
 
 # Function to move the ball based on its path
 def move_ball_path(ball):
-    x = ctypes.c_double(ball['pos'][0])
-    y = ctypes.c_double(ball['pos'][1])
-    vel_x = ctypes.c_double(ball['vel_x'])
-    vel_y = ctypes.c_double(ball['vel_y'])
-    gravity = ctypes.c_double(ball['gravity'] * 0.1)
-    w = ctypes.c_double(ball['w'])
-    angle = ctypes.c_double(math.radians(ball['angle']))
-    amp = ctypes.c_double(20)
+    x = ffi.new("double *", ball['pos'][0])
+    y = ffi.new("double *", ball['pos'][1])
+    vel_x = ffi.new("double *", ball['vel_x'])
+    vel_y = ffi.new("double *", ball['vel_y'])
+    gravity = ffi.new("double *", ball['gravity'] * 0.1)
+    w = ffi.new("double *", ball['w'])
+    angle = ffi.new("double *", math.radians(ball['angle']))
+    amp = ffi.new("double *", 20)
     
-    
+    start_time = time.perf_counter()    
     # Update the ball's position based on its path
     if ball['path'] == 'straight':
-        x.value += vel_x.value
+        x[0] += vel_x[0]
     elif ball['path'] == 'angled':
-        lib.move_angled(ctypes.byref(x), ctypes.byref(y), ctypes.byref(vel_x), ctypes.byref(angle))
+        lib.move_angled(x, y, vel_x, angle)
     elif ball['path'] == 'parabolic':
-        lib.move_parabolic(ctypes.byref(x), ctypes.byref(y), ctypes.byref(vel_x), ctypes.byref(vel_y), ctypes.byref(gravity))
-        ball['vel_y'] = vel_y.value
+        lib.move_parabolic(x, y, vel_x, vel_y, gravity)
+        ball['vel_y'] = vel_y[0]
     elif ball['path'] == 'sinusoidal':
-        start_time = time.perf_counter()
+        lib.move_sinusoidal(x, y, vel_x, w, amp)
 
-        lib.move_sinusoidal(ctypes.byref(x), ctypes.byref(y), ctypes.byref(vel_x), ctypes.byref(w), ctypes.byref(amp))
-
-        end_time = time.perf_counter()
-        duration = end_time - start_time
-        durations.append(duration)
+    end_time = time.perf_counter()
+    duration = end_time - start_time
+    durations.append(duration)
     
-
-    
-
-    return x.value, y.value, vel_x.value, vel_y.value
+    return x[0], y[0], vel_x[0], vel_y[0]
 
 # List of balls
 balls = []
@@ -78,7 +67,7 @@ score = 0
 font = pygame.font.SysFont('Arial', 30)
 
 # Timer variables
-t = 3
+t = 0.1
 last_shot_time = time.time()
 
 # Game loop
@@ -93,7 +82,7 @@ while running:
     current_time = time.time()
     if current_time - last_shot_time > t:
         path_choice = random.choice(['straight', 'angled', 'parabolic', 'sinusoidal'])
-        path_choice = "sinusoidal"
+        
         if path_choice == "parabolic":
             angle = random.randint(20, 30)
         else: 
@@ -130,7 +119,7 @@ while running:
             balls.remove(ball)
             score += 1
             if score % 10 == 0:
-                t = max(t - 0.5, 0.5)
+                t = max(t - 0.1, 0.1)
         pygame.draw.circle(win, red, (int(ball['pos'][0]), int(ball['pos'][1])), 10)
 
     # Draw player paddle

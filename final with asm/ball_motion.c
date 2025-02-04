@@ -1,4 +1,3 @@
-#include <math.h>
 
 // Command to compile the code as a shared library:
 // gcc -shared -o libballmotion.so -fPIC -g ball_motion.c -lm

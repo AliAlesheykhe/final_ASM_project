@@ -24,7 +24,7 @@ def move_ball_path(ball):
     w = ball['w']  # Get the angular velocity or frequency for sinusoidal motion
     gravity = ball['gravity']  # Get the gravity value for parabolic motion
 
-    
+    start_time = time.perf_counter()
 
     if ball['path'] == 'straight':
         x += vel_x  # Move the ball horizontally at constant velocity
@@ -36,17 +36,14 @@ def move_ball_path(ball):
         y -= vel_y  # Move the ball upwards initially
         vel_y -= gravity * 0.1  # Apply gravity over time to simulate parabolic motion
     elif ball['path'] == 'sinusoidal':
-        start_time = time.perf_counter()
-
         x += vel_x  # Move the ball horizontally at constant velocity
         y = height / 2 + 50 * math.sin(w * x)  # Adjust the vertical position based on sinusoidal motion
 
-        end_time = time.perf_counter()
-        duration = end_time - start_time
+    end_time = time.perf_counter()
+    duration = end_time - start_time
 
     durations.append(duration)
    
-
     return x, y, vel_x, vel_y  # Return the updated position and vertical velocity of the ball
 
 # لیست توپ‌ها
@@ -57,7 +54,7 @@ score = 0  # Initialize the player's score to zero
 font = pygame.font.SysFont('Arial', 30)  # Initialize the font for displaying the score
 
 # Timer variables
-t = 3  # Initial seconds between shots
+t = 0.1  # Initial seconds between shots
 last_shot_time = time.time()  # Record the time when the last shot was made
 
 running = True  # Set the running flag to True to start the game loop
@@ -72,7 +69,7 @@ while running:
     current_time = time.time()  # Get the current time
     if current_time - last_shot_time > t:  # Check if the time since the last shot exceeds t seconds
         path_choice = random.choice(['straight', 'angled', 'parabolic', 'sinusoidal'])  # Choose a random path
-        path_choice = "sinusoidal"
+        
         if path_choice == "parabolic":
             angle = random.randint(20, 30)
         else: 
@@ -105,7 +102,7 @@ while running:
             balls.remove(ball)  # Remove the ball if a collision is detected
             score += 1  # Increase the player's score
             if score % 10 == 0:  # Check if the score is a multiple of 10
-                t = max(t - 0.5, 0.5)  # Decrease t by 0.5 seconds, but not below 0.5 seconds
+                t = max(t - 0.1, 0.1)  # Decrease t by 0.5 seconds, but not below 0.5 seconds
         pygame.draw.circle(win, red, (int(ball['pos'][0]), int(ball['pos'][1])), 10)  # Draw the ball
 
     pygame.draw.rect(win, blue, player)  # Draw the player
