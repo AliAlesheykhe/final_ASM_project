@@ -10,6 +10,7 @@ ffi.cdef("""
     void move_parabolic(double *x, double *y, double *vel_x, double *vel_y, double *gravity);
     void move_sinusoidal(double *x, double *y, double *vel_x, double *w, double *amp);
     void move_angled(double *x, double *y, double *vel_x, double *angle);
+    void draw_ball(uint32_t* framebuffer, int width, int height, int cx, int cy, int radius, uint32_t color);
 """)
 
 # Load the shared library
@@ -46,7 +47,8 @@ def move_ball_path(ball):
     elif ball['path'] == 'angled':
         lib.move_angled(x, y, vel_x, angle)
     elif ball['path'] == 'parabolic':
-        lib.move_parabolic(x, y, vel_x, vel_y, gravity)
+        x[0] += vel_x[0]  # Move the ball horizontally at constant velocity
+        y[0] -= vel_y[0]  # Move the ball upwards initially
         ball['vel_y'] = vel_y[0]
     elif ball['path'] == 'sinusoidal':
         lib.move_sinusoidal(x, y, vel_x, w, amp)
@@ -82,7 +84,7 @@ while running:
     current_time = time.time()
     if current_time - last_shot_time > t:
         path_choice = random.choice(['straight', 'angled', 'parabolic', 'sinusoidal'])
-        path_choice = "sinusoidal"
+        #path_choice = "angled"
         if path_choice == "parabolic":
             angle = random.randint(20, 30)
         else:
@@ -130,3 +132,4 @@ while running:
     pygame.display.update()
 
 pygame.quit()
+

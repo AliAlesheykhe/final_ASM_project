@@ -36,31 +36,6 @@ void compute_tan(double* result) {
     );
 }
 
-// Function to move a ball in a parabolic path
-void move_parabolic(double *x, double *y, double *vel_x, double *vel_y, double *gravity) {
-    double gravity_scaled = *gravity * 0.1;
-    asm volatile (
-        "vbroadcastsd %[gravity_scaled], %%ymm4\n\t"  // Broadcast gravity into all elements of ymm4
-        
-        "vmovupd (%[x]), %%ymm0\n\t"                  // Load x into ymm0
-        "vmovupd (%[vel_x]), %%ymm1\n\t"              // Load vel_x into ymm1
-        "vmovupd (%[y]), %%ymm2\n\t"                  // Load y into ymm2
-        "vmovupd (%[vel_y]), %%ymm3\n\t"              // Load vel_y into ymm3
-
-        "vaddpd %%ymm1, %%ymm0, %%ymm0\n\t"           // x = x + vel_x
-        "vsubpd %%ymm4, %%ymm3, %%ymm3\n\t"           // vel_y = vel_y - gravity
-        "vsubpd %%ymm3, %%ymm2, %%ymm2\n\t"           // y = y - vel_y
-
-        "vmovupd %%ymm0, (%[x])\n\t"                  // Store x
-        "vmovupd %%ymm2, (%[y])\n\t"                  // Store y
-        "vmovupd %%ymm3, (%[vel_y])\n\t"              // Store vel_y
-        
-        : 
-        : [x] "r" (x), [y] "r" (y), [vel_x] "r" (vel_x), [vel_y] "r" (vel_y), [gravity_scaled] "m" (gravity_scaled)
-        : "ymm0", "ymm1", "ymm2", "ymm3", "ymm4"
-    );
-}
-
 // Function to move a ball in a sinusoidal path
 void move_sinusoidal(double *x, double *y, double *vel_x, double *w, double *amp) {
     alignas(32) double temp[4];
@@ -135,4 +110,3 @@ void move_angled(double *x, double *y, double *vel_x, double *angle) {
         : "ymm0", "ymm1", "ymm2", "ymm3"
     );
 }
-
