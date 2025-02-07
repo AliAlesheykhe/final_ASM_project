@@ -54,8 +54,9 @@ score = 0  # Initialize the player's score to zero
 font = pygame.font.SysFont('Arial', 30)  # Initialize the font for displaying the score
 
 # Timer variables
-t = 0.1  # Initial seconds between shots
+t = 0.01  # Initial seconds between shots
 last_shot_time = time.time()  # Record the time when the last shot was made
+ballCount = 0
 
 running = True  # Set the running flag to True to start the game loop
 while running:
@@ -87,6 +88,10 @@ while running:
             'gravity': random.randint(5, 10) if path_choice == 'parabolic' else 0
         }
         balls.append(ball)  # Add the new ball to the list of balls
+        ballCount += 1
+        if ballCount == 1001:
+            print(f"average time = {sum(durations) / len(durations)} seconds")
+            running = False
         last_shot_time = current_time  # Update the last shot time
 
     keys = pygame.key.get_pressed()  # Get the state of all keyboard keys
@@ -102,7 +107,7 @@ while running:
             balls.remove(ball)  # Remove the ball if a collision is detected
             score += 1  # Increase the player's score
             if score % 10 == 0:  # Check if the score is a multiple of 10
-                t = max(t - 0.1, 0.1)  # Decrease t by 0.5 seconds, but not below 0.5 seconds
+                t = max(t - 0.01, 0.01)  # Decrease t by 0.5 seconds, but not below 0.5 seconds
         pygame.draw.circle(win, red, (int(ball['pos'][0]), int(ball['pos'][1])), 10)  # Draw the ball
 
     pygame.draw.rect(win, blue, player)  # Draw the player

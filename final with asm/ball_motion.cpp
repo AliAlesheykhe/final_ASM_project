@@ -1,112 +1,74 @@
-#include <immintrin.h>
-#include <cstdlib>  // for _mm_malloc and _mm_free
+
+// Command to compile the code as a shared library:
+// gcc -shared -o libballmotion.so -fPIC -g ball_motion.c -lm
 
 extern "C" {
-    void compute_sin(double* result);
-    void compute_tan(double* result);
-    void move_parabolic(double *x, double *y, double *vel_x, double *vel_y, double *gravity);
     void move_sinusoidal(double *x, double *y, double *vel_x, double *w, double *amp);
     void move_angled(double *x, double *y, double *vel_x, double *angle);
 }
 
-// Ensure proper alignment for SIMD operations
-alignas(32) double x[4], y[4], vel_x[4], vel_y[4], temp[4];
-
-// Scalar functions for sine and tangent
-void compute_sin(double* result) {
+void move_sinusoidal(double *x, double *y, double *vel_x, double *w, double *amp){
     asm volatile (
-        "fldl (%0)\n\t"
-        "fsin\n\t"
-        "fstpl (%0)\n\t"
-        :
-        : "r" (result)
-        : "st"
+        // Load the current x position onto the FPU stack
+        "fldl %[x];"
+        // Add the horizontal velocity (vel_x) to the x position
+        "faddl %[vel_x];"
+        // Store the result back into the memory location of x
+        "fstpl %[x];"
+
+        // Load the current y position onto the FPU stack
+        "fldl %[y];"
+        // Load the angular frequency (w) onto the FPU stack
+        "fldl %[w];"
+        // Load the current x position onto the FPU stack
+        "fldl %[x];"
+        // Multiply x by w (x * w)
+        "fmulp %%st(1), %%st(0);"
+        // Compute sin(x * w)
+        "fsin;"
+        // Multiply sin(x * w) by amplitude
+        "fldl %[amp];"
+        "fmulp %%st(1), %%st(0);"
+        // Add the result to the y position
+        "faddp %%st(1), %%st(0);"
+        // Store the updated y position back into the memory location of y
+        "fstpl %[y];"
+
+        : [x] "+m" (*x), [y] "+m" (*y)  // Output operands: update the values at memory locations of x and y
+        : [vel_x] "m" (*vel_x), [w] "m" (*w), [amp] "m" (*amp)  // Input operands: pass values of vel_x, w, and amplitude
+        : "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"  // Clobbers: indicate that the FPU stack is modified
     );
 }
 
-void compute_tan(double* result) {
-    asm volatile (
-        "fldl (%0)\n\t"
-        "fptan\n\t"
-        "fstp %%st(0)\n\t"
-        "fstpl (%0)\n\t"
-        :
-        : "r" (result)
-        : "st"
-    );
-}
-
-// Function to move a ball in a sinusoidal path
-void move_sinusoidal(double *x, double *y, double *vel_x, double *w, double *amp) {
-    alignas(32) double temp[4];
-    
-    asm volatile (
-        "vmovupd (%[x]), %%ymm0\n\t"                  // Load x into ymm0
-        "vmovupd (%[vel_x]), %%ymm1\n\t"              // Load vel_x into ymm1
-        "vmovupd (%[y]), %%ymm2\n\t"                  // Load y into ymm2
-        "vbroadcastsd %[w], %%ymm3\n\t"               // Broadcast w into all elements of ymm3
-        "vbroadcastsd %[amp], %%ymm4\n\t"             // Broadcast amp into all elements of ymm4
-        
-        "vaddpd %%ymm1, %%ymm0, %%ymm0\n\t"           // x = x + vel_x
-        "vmovupd %%ymm0, (%[x])\n\t"                  // Store x
-
-        "vmulpd %%ymm3, %%ymm0, %%ymm0\n\t"           // w * x
-        "vmovupd %%ymm0, %[temp]\n\t"                 // Store result temporarily
-
-        : [temp] "=m" (temp)
-        : [x] "r" (x), [y] "r" (y), [vel_x] "r" (vel_x), [w] "m" (*w), [amp] "m" (*amp)
-        : "ymm0", "ymm1", "ymm2", "ymm3", "ymm4"
-    );
-
-    
-    compute_sin(&temp[0]);   // Scalar sine computation
-    
-    
-    asm volatile (
-        "vmovupd %[temp], %%ymm0\n\t"                 // Load sine results into ymm0
-        "vmulpd %%ymm4, %%ymm0, %%ymm0\n\t"           // amp * sin(w * x)
-        "vaddpd %%ymm0, %%ymm2, %%ymm2\n\t"           // y = y + amp * sin(w * x)
-
-        "vmovupd %%ymm2, (%[y])\n\t"                  // Store y
-        
-        : 
-        : [x] "r" (x), [y] "r" (y), [temp] "m" (temp)
-        : "ymm0", "ymm2", "ymm4"
-    );
-}
-
-// Function to move a ball at an angle
 void move_angled(double *x, double *y, double *vel_x, double *angle) {
-    alignas(32) double temp[4];
-
     asm volatile (
-        "vmovupd (%[x]), %%ymm0\n\t"                  // Load x into ymm0
-        "vmovupd (%[vel_x]), %%ymm1\n\t"              // Load vel_x into ymm1
-        "vmovupd (%[y]), %%ymm2\n\t"                  // Load y into ymm2
-        "vbroadcastsd %[angle], %%ymm3\n\t"           // Broadcast angle into all elements of ymm3
+        // Load the current x position onto the FPU stack
+        "fldl %[x];"
+        // Add the horizontal velocity (vel_x) to the x position
+        "faddl %[vel_x];"
+        // Store the result back into the memory location of x
+        "fstpl %[x];"
 
-        "vaddpd %%ymm1, %%ymm0, %%ymm0\n\t"           // x = x + vel_x
-        "vmovupd %%ymm3, %[temp]\n\t"                 // Store angle temporarily
+        // Load the current y position onto the FPU stack
+        "fldl %[y];"
+        // Load the horizontal velocity (vel_x) onto the FPU stack
+        "fldl %[vel_x];"
+        // Load the angle onto the FPU stack
+        "fldl %[angle];"
+        // Compute the tangent of the angle (pushes tan(angle) and 1.0 onto the stack)
+        "fptan;"
+        // Pop the 1.0 from the stack (discard it)
+        "fstp %%st(0);"
+        // Multiply the tangent by the horizontal velocity (vel_x)
+        "fmulp %%st(1), %%st(0);"
+        // Subtract the result from the y position (y -= vel_x * tan(angle))
+        // Use fsubp to subtract st(0) from st(1) and pop the stack
+        "fsubrp %%st(0), %%st(1);"
+        // Store the updated y position back into the memory location of y
+        "fstpl %[y];"
 
-        : [temp] "=m" (temp)
-        : [x] "r" (x), [y] "r" (y), [vel_x] "r" (vel_x), [angle] "m" (*angle)
-        : "ymm0", "ymm1", "ymm2", "ymm3"
-    );
-
-    
-    compute_tan(&temp[0]);   // Scalar tangent computation
-    
-    
-    asm volatile (
-        "vmovupd %[temp], %%ymm3\n\t"                 // Load tangent results into ymm3
-        "vmulpd %%ymm3, %%ymm1, %%ymm1\n\t"           // vel_x * tan(angle)
-        "vsubpd %%ymm1, %%ymm2, %%ymm2\n\t"           // y = y - vel_x * tan(angle)
-
-        "vmovupd %%ymm0, (%[x])\n\t"                  // Store x
-        "vmovupd %%ymm2, (%[y])\n\t"                  // Store y
-        
-        : 
-        : [x] "r" (x), [y] "r" (y), [temp] "m" (temp)
-        : "ymm0", "ymm1", "ymm2", "ymm3"
+        : [x] "+m" (*x), [y] "+m" (*y)  // Output operands: update the values at memory locations of x and y
+        : [vel_x] "m" (*vel_x), [angle] "m" (*angle)  // Input operands: pass values of vel_x and angle
+        : "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"  // Clobbers: indicate that the FPU stack is modified
     );
 }

@@ -10,7 +10,6 @@ ffi.cdef("""
     void move_parabolic(double *x, double *y, double *vel_x, double *vel_y, double *gravity);
     void move_sinusoidal(double *x, double *y, double *vel_x, double *w, double *amp);
     void move_angled(double *x, double *y, double *vel_x, double *angle);
-    void draw_ball(uint32_t* framebuffer, int width, int height, int cx, int cy, int radius, uint32_t color);
 """)
 
 # Load the shared library
@@ -31,32 +30,32 @@ blue = (0, 0, 255)
 
 # Function to move the ball based on its path
 def move_ball_path(ball):
-    x = ffi.new("double[4]", [ball['pos'][0]])
-    y = ffi.new("double[4]", [ball['pos'][1]])
-    vel_x = ffi.new("double[4]", [ball['vel_x']])
-    vel_y = ffi.new("double[4]", [ball['vel_y']])
-    gravity = ffi.new("double*", ball['gravity'])
-    w = ffi.new("double*", ball['w'])
-    angle = ffi.new("double*", math.radians(ball['angle']))
-    amp = ffi.new("double*", 20)
-
-    start_time = time.perf_counter()
+    x = ffi.new("double *", ball['pos'][0])
+    y = ffi.new("double *", ball['pos'][1])
+    vel_x = ffi.new("double *", ball['vel_x'])
+    vel_y = ffi.new("double *", ball['vel_y'])
+    gravity = ffi.new("double *", ball['gravity'] * 0.1)
+    w = ffi.new("double *", ball['w'])
+    angle = ffi.new("double *", math.radians(ball['angle']))
+    amp = ffi.new("double *", 20)
+    
+    start_time = time.perf_counter()    
     # Update the ball's position based on its path
     if ball['path'] == 'straight':
         x[0] += vel_x[0]
     elif ball['path'] == 'angled':
         lib.move_angled(x, y, vel_x, angle)
     elif ball['path'] == 'parabolic':
-        x[0] += vel_x[0]  # Move the ball horizontally at constant velocity
-        y[0] -= vel_y[0]  # Move the ball upwards initially
-        ball['vel_y'] = vel_y[0]
+        x[0] += vel_x[0]
+        y[0] -= vel_y[0]
+        vel_y[0] -= gravity[0] * 0.1
     elif ball['path'] == 'sinusoidal':
         lib.move_sinusoidal(x, y, vel_x, w, amp)
 
     end_time = time.perf_counter()
     duration = end_time - start_time
     durations.append(duration)
-
+    
     return x[0], y[0], vel_x[0], vel_y[0]
 
 # List of balls
@@ -69,9 +68,9 @@ score = 0
 font = pygame.font.SysFont('Arial', 30)
 
 # Timer variables
-t = 0.1
+t = 0.01
 last_shot_time = time.time()
-
+ballCount = 0
 # Game loop
 running = True
 while running:
@@ -84,10 +83,10 @@ while running:
     current_time = time.time()
     if current_time - last_shot_time > t:
         path_choice = random.choice(['straight', 'angled', 'parabolic', 'sinusoidal'])
-        #path_choice = "angled"
+        
         if path_choice == "parabolic":
             angle = random.randint(20, 30)
-        else:
+        else: 
             angle = random.randint(-20, 20)
         vel = random.randint(20, 30)
         vel_x = vel * math.cos(math.radians(angle))
@@ -102,6 +101,10 @@ while running:
             'gravity': random.randint(5, 10) if path_choice == 'parabolic' else 0
         }
         balls.append(ball)
+        ballCount += 1
+        if ballCount == 1001:
+            print(f"average time = {sum(durations) / len(durations)} seconds")
+            running = False
         last_shot_time = current_time
 
     # Move player paddle
@@ -116,12 +119,12 @@ while running:
     for ball in balls:
         # Move and draw the ball
         ball['pos'][0], ball['pos'][1], ball["vel_x"], ball['vel_y'] = move_ball_path(ball)
-
+        
         if player.colliderect(pygame.Rect(int(ball['pos'][0]), int(ball['pos'][1]), 10, 10)):
             balls.remove(ball)
             score += 1
             if score % 10 == 0:
-                t = max(t - 0.1, 0.1)
+                t = max(t - 0.01, 0.01)
         pygame.draw.circle(win, red, (int(ball['pos'][0]), int(ball['pos'][1])), 10)
 
     # Draw player paddle
@@ -132,4 +135,3 @@ while running:
     pygame.display.update()
 
 pygame.quit()
-
