@@ -1,8 +1,9 @@
-import pygame
+import tkinter as tk
 import math
 import random
 import time
 import cffi
+from PIL import Image, ImageTk
 
 def main():
     # Initialize cffi
@@ -17,11 +18,11 @@ def main():
     # Load the shared library
     lib = ffi.dlopen("/media/aa/84423E3E423E34F0/University/computer structure and language/final project/final with asm/libballmotion.so")
 
-    # Initialize pygame
-    pygame.init()
+    # Initialize Tkinter
+    root = tk.Tk()
     width, height = 1000, 600
-    win = pygame.display.set_mode((width, height))
-    pygame.display.set_caption("Ball Movement")
+    canvas = tk.Canvas(root, width=width, height=height, bg="black")
+    canvas.pack()
     durations1 = []
     durations2 = []
 
@@ -30,6 +31,15 @@ def main():
     white = (255, 255, 255)
     red = (255, 0, 0)
     blue = (0, 0, 255)
+
+    # Ball radius variable
+    ball_radius = 10
+
+    # Create a buffer image for drawing
+    buffer_image = Image.new("RGBA", (width, height), black)
+    buffer_data = ffi.new("uint8_t[]", buffer_image.tobytes())
+    buffer_tk = ImageTk.PhotoImage(buffer_image)
+    canvas_image = canvas.create_image(0, 0, anchor="nw", image=buffer_tk)
 
     # Function to move the ball based on its path
     def move_ball_path(ball):
@@ -64,30 +74,27 @@ def main():
     # List of balls
     balls = []
     # Player paddle
-    player = pygame.Rect(width - 50, height // 2 - 30, 20, 100)
+    player = canvas.create_rectangle(width - 50, height // 2 - 30, width - 30, height // 2 + 80, fill="blue")
     score = 0
-
-    # Font for displaying the score
-    font = pygame.font.SysFont('Arial', 30)
 
     # Timer variables
     interval = 0.001
     t = interval
     last_shot_time = time.time()
     ballCount = 0
-    # Game loop
-    running = True
-    while running:
-        pygame.time.delay(30)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                print(f"average time = {sum(durations1) / len(durations1)} seconds")
-                running = False
+    # Label for displaying the score
+    score_text = canvas.create_text(10, 10, anchor="nw", fill="white", font=("Arial", 30), text=f"Score: {score}")
+
+    # Function to update the game
+    def update_game():
+        nonlocal last_shot_time, ballCount, score, t, running, buffer_image, buffer_data, buffer_tk
+
+        if not running:
+            return
 
         current_time = time.time()
         if current_time - last_shot_time > t:
             path_choice = random.choice(['straight', 'angled', 'parabolic', 'sinusoidal'])
-            #path_choice = "angled"
             if path_choice == "parabolic":
                 angle = random.randint(20, 30)
             else:
@@ -112,47 +119,57 @@ def main():
                 running = False
             last_shot_time = current_time
 
-        # Move player paddle
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_UP] and player.top > 0:
-            player.y -= 20
-        if keys[pygame.K_DOWN] and player.bottom < height:
-            player.y += 20
-
-        # Draw background
         start_time = time.perf_counter()
 
-        win.fill(black)
-        pixel_array = pygame.PixelArray(win)
-        surface_ptr = ffi.cast("uint8_t*", pixel_array.surface._pixels_address)
-        for ball in balls:
-            # Move and draw the ball
+        # Clear the buffer
+        buffer_image.paste((0, 0, 0, 0), (0, 0, width, height))
+        buffer_data = ffi.new("uint8_t[]", buffer_image.tobytes())
+
+        for ball in balls[:]:
             ball['pos'][0], ball['pos'][1], ball["vel_x"], ball['vel_y'] = move_ball_path(ball)
 
-            if player.colliderect(pygame.Rect(int(ball['pos'][0]), int(ball['pos'][1]), 10, 10)):
+            if canvas.bbox(player)[2] > ball['pos'][0] > canvas.bbox(player)[0] and \
+               canvas.bbox(player)[3] > ball['pos'][1] > canvas.bbox(player)[1]:
                 balls.remove(ball)
                 score += 1
                 if score % 10 == 0:
                     t = max(t - interval, interval)
-            # Use the draw_ball function to draw the ball
-            lib.draw_ball(surface_ptr, int(ball['pos'][0]), int(ball['pos'][1]), 10, 0x0000FF)  # Red color in hex
-            
+                canvas.itemconfig(score_text, text=f"Score: {score}")
 
-        # Unlock the surface and delete the pixel array to ensure it’s no longer locked
-        del pixel_array
-
-        # Draw player paddle
-        pygame.draw.rect(win, blue, player)
-        # Display the score
-        score_text = font.render(f'Score: {score}', True, white)
-        win.blit(score_text, (10, 10))
-        pygame.display.update()
+            # Use the draw_ball function to draw the ball on the buffer
+            lib.draw_ball(buffer_data, int(ball['pos'][0]), int(ball['pos'][1]), ball_radius, 0xFF0000)  # Red color in hex
 
         end_time = time.perf_counter()
         durations2.append(end_time - start_time)
 
-    pygame.quit()
+        # Update the canvas with the buffer image
+        buffer_image = Image.frombytes("RGBA", (width, height), bytes(buffer_data))
+        buffer_tk = ImageTk.PhotoImage(buffer_image)
+        canvas.itemconfig(canvas_image, image=buffer_tk)
+        canvas.image = buffer_tk
 
+        root.after(30, update_game)
+
+    # Function to move player paddle up
+    def move_player_up(event):
+        if canvas.coords(player)[1] > 0:
+            canvas.move(player, 0, -20)
+
+    # Function to move player paddle down
+    def move_player_down(event):
+        if canvas.coords(player)[3] < height:
+            canvas.move(player, 0, 20)
+
+    # Bind keys for player paddle movement
+    root.bind('<Up>', move_player_up)
+    root.bind('<Down>', move_player_down)
+
+    # Start the game loop
+    running = True
+    update_game()
+    root.mainloop()
+
+# Measure total time taken for the game
 start_time = time.perf_counter()
 main()
 end_time = time.perf_counter()
